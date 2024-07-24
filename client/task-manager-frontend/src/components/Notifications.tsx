@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import axios from 'axios';
 import { useUser } from '@clerk/clerk-react';
-import io from 'socket.io-client'; // Import socket.io-client
+
 import { API_SERVER } from '../config/api';
 
-const socket = io(API_SERVER+'/'); // Replace with your server URL
 
 const NotificationContainer = styled.div`
   width: 100%;
@@ -67,14 +66,7 @@ const NotificationComponent = () => {
       fetchNotifications();
     }
 
-    // Socket.io events
-    socket.on('notification', (notification:Notification) => {
-      setNotifications((prevNotifications) => [notification, ...prevNotifications]);
-    });
-
-    return () => {
-      socket.off('notification');
-    };
+   
   }, [user]);
 
   return (

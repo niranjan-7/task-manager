@@ -184,6 +184,7 @@ export const Task: React.FC<TaskProps> = ({ index,taskId, priority, name, descri
         }
       };
     return (
+        <div>
         <Draggable draggableId={taskId} index={index}>
         {
             (provided)=>(
@@ -205,7 +206,8 @@ export const Task: React.FC<TaskProps> = ({ index,taskId, priority, name, descri
                 </IssueItem>
             )
         }
-        
         </Draggable>
+        </div>
+            
     );
 };

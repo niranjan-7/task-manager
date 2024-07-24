@@ -3,10 +3,9 @@ import styled from 'styled-components';
 import { Task } from './Task';
 import { useUser } from '@clerk/clerk-react';
 import { API_SERVER } from '../../config/api';
-import io from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { DragDropContext, DropResult, Droppable } from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, DropResult, Droppable } from 'react-beautiful-dnd';
 
 
 const Board = styled.div`
@@ -89,16 +88,17 @@ const ItemTypes = {
     TASK: 'task',
 };
 
-const ColumnList: React.FC<{ context: string, taskList: Task[] }> = ({ context, taskList }) => {
-    return (
+const ColumnList: React.FC<{ context: string, taskList: Task[],droppableId:string }> = ({ context, taskList,droppableId }) => {
+        return (
         <div>
-            <Droppable droppableId='TaskList'>
+            <Column >
+                    <ColumnTitle>{context}</ColumnTitle>
+            <Droppable droppableId={droppableId} key={droppableId}>
             {
                 (provided) => (
-                    <Column ref={provided.innerRef} {...provided.droppableProps}>
-                    <ColumnTitle>{context}</ColumnTitle>
-                    <IssueList>
-                        {taskList.map((task, index) => (
+                    
+                    <IssueList ref={provided.innerRef} {...provided.droppableProps}>
+                       {taskList.map((task, index) => (
                             <Task
                                 index={index}
                                 taskId={task._id}
@@ -114,10 +114,11 @@ const ColumnList: React.FC<{ context: string, taskList: Task[] }> = ({ context, 
                         ))}
                         {provided.placeholder}
                     </IssueList>
-                </Column>            
+                          
                 )
             }
             </Droppable>
+            </Column>
         </div>
 
     );
@@ -137,7 +138,6 @@ const AgileBoard: React.FC = () => {
     const [filterName, setFilterName] = useState<string>(''); 
     const [filterDesc, setFilterDesc] = useState<string>(''); 
     const [selectedPriority, setSelectedPriority] = useState<'Low' | 'High' | 'Medium' | 'All'>('All');
-    const socket = io(API_SERVER+'/');
 
     const handleTaskCreated = (task: Task) => {
         switch (task.status) {
@@ -304,28 +304,48 @@ const AgileBoard: React.FC = () => {
 
     const onDragEnd = (result:DropResult) => {
         const { source , destination } = result;
-        console.log(result);
+    console.log(result);
 
         if (!destination) return;
         
         if (destination.droppableId ===source.droppableId) return ;
         
     }
-
+    const taskStatus = {
+        pending: {
+          name: "Pending",
+          items: pendingTasks
+        },
+        progress: {
+          name: "In Progress",
+          items: progressTasks
+        },
+        completed: {
+          name: "Completed",
+          items: completedTasks
+        }
+      };
+    const [columns, setColumns] = useState(taskStatus);
     return (
         <div>
             <Board>
                 <FilterButton onClick={() => { navigate('/dashboard/create-task') }}>Add a Task</FilterButton>
-                <DragDropContext onDragEnd={onDragEnd}>
-                            <ColumnBox>
-                                <ColumnList context="Pending" taskList={pendingTasks} />
-                                <ColumnList context="In Progress" taskList={progressTasks} />
-                                <ColumnList context="Completed" taskList={completedTasks} />
-                           </ColumnBox>
-                </DragDropContext>
+                <ColumnBox>
+                    <DragDropContext onDragEnd={onDragEnd}>
+                        <ColumnList context="Pending" taskList={pendingTasks} droppableId='pending'/>
+                        <ColumnList context="In Progress" taskList={progressTasks} droppableId='progress'/>
+                        <ColumnList context="Completed" taskList={completedTasks} droppableId='completed'/>
+                    </DragDropContext>
+                </ColumnBox>
             </Board>            
         </div>
+
     );
 };
 
 export default AgileBoard;
+
+
+{/* 
+                        <ColumnList context="In Progress" taskList={progressTasks} />
+                        <ColumnList context="Completed" taskList={completedTasks} /> */}
