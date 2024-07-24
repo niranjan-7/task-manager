@@ -18,7 +18,7 @@
 - Access Validation for different roles for a Task
 - Drag and Drop feature across different status 
 - Notifications for every action to Viewers, Collaborators , Creator 
-- Use Email address or Goggle Account
+- Use Email address or Goggle Account to Login
 
 ## Backend Structure 
 
