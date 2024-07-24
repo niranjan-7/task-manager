@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { io } from 'socket.io-client';
 import styled from 'styled-components';
 import { format, isAfter } from 'date-fns';
 import { API_SERVER } from '../config/api';
