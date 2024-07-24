@@ -197,14 +197,7 @@ const AgileBoard: React.FC = () => {
     }, [isSignedIn, isLoaded, user]);
 
     useEffect(() => {
-        socket.on('taskCreated', handleTaskCreated);
-        socket.on('taskUpdated', handleTaskUpdated);
-        socket.on('taskDeleted', handleTaskDeleted);
         fetchTasks();
-
-        return () => {
-            socket.disconnect();
-        };
     }, [currentUserEmail]);
 
     useEffect(() => {
@@ -268,6 +261,7 @@ const AgileBoard: React.FC = () => {
     const handleEditTask = async (updatedTask: any, taskId: string) => {
         try {
             await axios.put(API_SERVER + `/api/tasks/${taskId}`, updatedTask);
+            handleTaskUpdated(updatedTask);
         } catch (error) {
             console.error('Error updating task:', error);
         }
