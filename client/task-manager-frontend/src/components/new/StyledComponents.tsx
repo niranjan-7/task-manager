@@ -61,7 +61,6 @@ export const FilterButton = styled.button`
 
 interface IssueItemProps {
     type?: 'Low' | 'Medium' | 'High';
-    overdue: boolean;
 }
 
 export const IssueItem = styled.li<IssueItemProps>`
@@ -106,9 +105,7 @@ export const IssueItem = styled.li<IssueItemProps>`
         border-top: 0;
     }
 
-    ${props => props.overdue && `
-        background-color: #f8d7da; /* Light red background for overdue tasks */
-    `}
+    
 `;
 
 export const StyledLink = styled(Link)`

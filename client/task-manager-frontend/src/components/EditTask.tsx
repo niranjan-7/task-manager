@@ -28,7 +28,7 @@ const EditTask: React.FC = () => {
   const handleEditTask = async (updatedTask: any) => {
     try {
       await axios.put(API_SERVER+`/api/tasks/${taskId}`, updatedTask);
-      navigate('/dashboard/tasks');
+      navigate('/dashboard/tasks'); 
     } catch (error) {
       console.error('Error updating task:', error);
     }

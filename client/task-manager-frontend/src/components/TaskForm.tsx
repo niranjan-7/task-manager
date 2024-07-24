@@ -113,7 +113,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ initialTask, onSubmit, submitButton
           dueDate,
           priority,
           status,
-          collaborators,
+          collaborators, 
           viewers,
         },
         { abortEarly: false }
