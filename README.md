@@ -8,7 +8,7 @@
 - Google Icons
 - Google fonts
 - styled components(CSS)
-- Vercel(Frontend Deployment)
+- Vercel(Frontend Deployment) [task-manager-five-red.vercel.app]
 - Render(Backend Deployment)
  
 
