@@ -203,7 +203,7 @@ const AgileBoard: React.FC = () => {
                                                                 {(task.collaborators.includes(currentUserEmail as string) || currentUserEmail === task.creatorEmail) && (
                                                                     <StyledLink to={`edit/${task._id}`}><Button src={editIcon} /></StyledLink>
                                                                 )}
-                                                                <Button src={deleteIcon} onClick={() => deleteTask(task._id)} />
+                                                                {currentUserEmail == task.creatorEmail&&<Button src={deleteIcon} onClick={() => deleteTask(task._id)} />}
                                                             </ActionButtons>
                                                             <TaskName to={`${task._id}`}>{task.name}</TaskName>
                                                             <Description>{task.description}</Description>
