@@ -133,7 +133,6 @@ const TaskDetail: React.FC = () => {
     const [addingViewer, setAddingViewer] = useState<boolean>(false);
     const [addingCollaborator, setAddingCollaborator] = useState<boolean>(false);
 
-    const socket = io(API_SERVER + '/');
     const { user } = useUser();
     const dueDate = new Date(task.dueDate);
     const overdue = isAfter(currentDate, dueDate);
@@ -149,17 +148,7 @@ const TaskDetail: React.FC = () => {
         };
         fetchTask();
 
-        // Socket.io listener for task updates
-        socket.on('taskUpdated', (updatedTask: any) => {
-            if (updatedTask._id === taskId) {
-                setTask(updatedTask);
-            }
-        });
-
-        return () => {
-            socket.off('taskUpdated');
-        };
-    }, [taskId, socket]);
+    }, [taskId]);
 
     const addViewer = async () => {
         setAddingViewer(true);
