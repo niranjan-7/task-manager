@@ -5,10 +5,13 @@ import { useUser } from '@clerk/clerk-react';
 import { API_SERVER } from '../../config/api';
 import io from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 const Board = styled.div`
     display: flex;
-    flex-direction: column; /* Adjusted to column layout */
+    flex-direction: column;
     margin: 10px;
     overflow: hidden;
 `;
@@ -16,12 +19,14 @@ const Board = styled.div`
 const Column = styled.div`
     display: flex;
     flex-direction: column;
-    width: 100%; /* Full width for each column */
+    width: 100%;
     padding: 10px;
 `;
+
 const ColumnBox = styled.div`
-    display:flex;
-`
+    display: flex;
+`;
+
 const ColumnTitle = styled.h3`
     margin-top: 0;
     margin-bottom: 10px;
@@ -61,11 +66,6 @@ const FilterButton = styled.button`
     font-size: 14px;
 `;
 
-// const PriorityFilter = styled.select`
-//     padding: 8px;
-//     font-size: 14px;
-// `;
-
 interface Task {
     _id: string;
     name: string;
@@ -77,6 +77,16 @@ interface Task {
     collaborators: string[];
     viewers: string[];
 }
+
+interface DraggableTaskProps{
+    task:Task;
+    index:number;
+    moveTask:any;
+}
+
+const ItemTypes = {
+    TASK: 'task',
+};
 
 const AgileBoard: React.FC = () => {
     const { isSignedIn, user, isLoaded } = useUser();
@@ -90,13 +100,10 @@ const AgileBoard: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
     const [filterName, setFilterName] = useState<string>(''); 
-    const [filterDesc, setFilterDesc] = useState<string>(''); // State for filter name
+    const [filterDesc, setFilterDesc] = useState<string>(''); 
     const [selectedPriority, setSelectedPriority] = useState<'Low' | 'High' | 'Medium' | 'All'>('All');
     const socket = io(API_SERVER+'/');
 
-   
-
-    // Event handlers for specific task events
     const handleTaskCreated = (task: Task) => {
         switch (task.status) {
             case 'Pending':
@@ -151,9 +158,8 @@ const AgileBoard: React.FC = () => {
         }
     };
 
-    // Function to fetch tasks
     const fetchTasks = async () => {
-        setIsLoading(true); // Set loading state to true when fetching tasks
+        setIsLoading(true);
         try {
             let pendingUrl = `${API_SERVER}/api/tasks?status=${encodeURIComponent('Pending')}`;
             let inProgressUrl = `${API_SERVER}/api/tasks?status=${encodeURIComponent('In Progress')}`;
@@ -191,19 +197,15 @@ const AgileBoard: React.FC = () => {
     }, [isSignedIn, isLoaded, user]);
 
     useEffect(() => {
-        // Subscribe to socket events
         socket.on('taskCreated', handleTaskCreated);
         socket.on('taskUpdated', handleTaskUpdated);
         socket.on('taskDeleted', handleTaskDeleted);
-
-        // Fetch tasks initially
         fetchTasks();
 
         return () => {
-            // Clean up socket connection
             socket.disconnect();
         };
-    }, [currentUserEmail]); // Include filterName in dependencies to refetch tasks when filter changes
+    }, [currentUserEmail]);
 
     useEffect(() => {
         const filterTasks = () => {
@@ -221,11 +223,10 @@ const AgileBoard: React.FC = () => {
             setCompletedTasks(filteredCompletedByName);
         };
 
-        if (filterName!=''){
-        filterTasks();
+        if (filterName !== '') {
+            filterTasks();
         }
     }, [filterName]);
-
 
     useEffect(() => {
         const filterTasks = () => {
@@ -243,119 +244,150 @@ const AgileBoard: React.FC = () => {
             setCompletedTasks(filteredCompletedByDesc);
         };
 
-        if (filterDesc!=''){
-        filterTasks();
+        if (filterDesc !== '') {
+            filterTasks();
         }
     }, [filterDesc]);
-    // const handlePriorityChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    //     const selectedPriorityValue = event.target.value as 'Low' | 'High' | 'Medium' | 'All';
-    //     setSelectedPriority(selectedPriorityValue !== 'All' ? selectedPriorityValue : 'All');
-    // };
 
-    const handleResetForName = () =>{
-        setSelectedPriority('All')
-        setFilterName('')
-        setPendingTasks(pending1Tasks)
-        setProgressTasks(progress1Tasks)
-        setCompletedTasks(completed1Tasks)
-    }
+    const handleResetForName = () => {
+        setSelectedPriority('All');
+        setFilterName('');
+        setPendingTasks(pending1Tasks);
+        setProgressTasks(progress1Tasks);
+        setCompletedTasks(completed1Tasks);
+    };
 
-    const handleResetForDesc = () =>{
-        setSelectedPriority('All')
-        setFilterDesc('')
-        setPendingTasks(pending1Tasks)
-        setProgressTasks(progress1Tasks)
-        setCompletedTasks(completed1Tasks)
-    }
+    const handleResetForDesc = () => {
+        setSelectedPriority('All');
+        setFilterDesc('');
+        setPendingTasks(pending1Tasks);
+        setProgressTasks(progress1Tasks);
+        setCompletedTasks(completed1Tasks);
+    };
+
+    const handleEditTask = async (updatedTask: any, taskId: string) => {
+        try {
+            await axios.put(API_SERVER + `/api/tasks/${taskId}`, updatedTask);
+        } catch (error) {
+            console.error('Error updating task:', error);
+        }
+    };
+
+    const moveTask = (taskId: string, sourceStatus: string, targetStatus: string) => {
+        let taskToUpdate: Task | undefined;
+
+        const updateTaskLists = (sourceList: Task[], targetList: Task[]) => {
+            const taskIndex = sourceList.findIndex(task => task._id === taskId);
+            if (taskIndex !== -1) {
+                taskToUpdate = { ...sourceList[taskIndex], status: targetStatus };
+                sourceList.splice(taskIndex, 1);
+                targetList.push(taskToUpdate);
+            }
+        };
+
+        switch (sourceStatus) {
+            case 'Pending':
+                updateTaskLists(pendingTasks, targetStatus === 'In Progress' ? progressTasks : completedTasks);
+                break;
+            case 'In Progress':
+                updateTaskLists(progressTasks, targetStatus === 'Pending' ? pendingTasks : completedTasks);
+                break;
+            case 'Completed':
+                updateTaskLists(completedTasks, targetStatus === 'Pending' ? pendingTasks : progressTasks);
+                break;
+            default:
+                break;
+        }
+
+        if (taskToUpdate) {
+            handleEditTask(taskToUpdate, taskId);
+        }
+    };
 
     return (
-        <Board>
-            <FilterContainer>
-                <FilterInput
-                    type="text"
-                    placeholder="Filter by name..."
-                    value={filterName}
-                    onChange={(e) => setFilterName(e.target.value)}
-                />
-                {/* <PriorityFilter onChange={handlePriorityChange} value={selectedPriority}>
-                    <option value="All">All Priorities</option>
-                    <option value="High">High Priority</option>
-                    <option value="Medium">Medium Priority</option>
-                    <option value="Low">Low Priority</option>
-                </PriorityFilter> */}
-                <FilterButton onClick={handleResetForName}>Reset</FilterButton>
-            </FilterContainer>
-            <FilterContainer>
-                <FilterInput
-                    type="text"
-                    placeholder="Filter by description..."
-                    value={filterDesc}
-                    onChange={(e) => setFilterDesc(e.target.value)}
-                />
-                <FilterButton onClick={handleResetForDesc}>Reset</FilterButton>
-            </FilterContainer>
-            <FilterButton onClick={()=>{navigate('/dashboard/create-task')}}>Add a Task</FilterButton>
-            {isLoading ? (
-                <p>Loading...</p>
-            ) : (
-                <ColumnBox>
-                    <Column>
-                        <ColumnTitle>Pending</ColumnTitle>
-                        <IssueList>
-                            {pendingTasks.map(task => (
-                                <Task
-                                    taskId={task._id}
-                                    key={task._id}
-                                    priority={task.priority}
-                                    collaborators={task.collaborators}
-                                    name={task.name}
-                                    description={task.description}
-                                    dueDate={task.dueDate}
-                                    creatorEmail={task.creatorEmail}
-                                    status='Pending'
-                                />
-                            ))}
-                        </IssueList>
-                    </Column>
-                    <Column>
-                        <ColumnTitle>In Progress</ColumnTitle>
-                        <IssueList>
-                            {progressTasks.map(task => (
-                                <Task
-                                    key={task._id}
-                                    taskId={task._id}
-                                    priority={task.priority}
-                                    collaborators={task.collaborators}
-                                    name={task.name}
-                                    description={task.description}
-                                    dueDate={task.dueDate}
-                                    creatorEmail={task.creatorEmail}
-                                    status='In Progress'
-                                />
-                            ))}
-                        </IssueList>
-                    </Column>
-                    <Column>
-                        <ColumnTitle>Completed</ColumnTitle>
-                        <IssueList>
-                            {completedTasks.map(task => (
-                                <Task
-                                    key={task._id}
-                                    taskId={task._id}
-                                    priority={task.priority}
-                                    name={task.name}
-                                    description={task.description}
-                                    dueDate={task.dueDate}
-                                    creatorEmail={task.creatorEmail}
-                                    collaborators={task.collaborators}
-                                    status='Completed'
-                                />
-                            ))}
-                        </IssueList>
-                    </Column>
-                </ColumnBox>
-            )}
-        </Board>
+        <DndProvider backend={HTML5Backend}>
+            <div>
+                <FilterContainer>
+                    <FilterInput
+                        type="text"
+                        placeholder="Filter by name"
+                        value={filterName}
+                        onChange={e => setFilterName(e.target.value)}
+                    />
+                    <FilterButton onClick={handleResetForName}>Reset</FilterButton>
+                </FilterContainer>
+                <FilterContainer>
+                    <FilterInput
+                        type="text"
+                        placeholder="Filter by description"
+                        value={filterDesc}
+                        onChange={e => setFilterDesc(e.target.value)}
+                    />
+                    <FilterButton onClick={handleResetForDesc}>Reset</FilterButton>
+                </FilterContainer>
+                <Board>
+                    <ColumnBox>
+                        <Column>
+                            <ColumnTitle>Pending</ColumnTitle>
+                            <IssueList>
+                                {pendingTasks.map((task, index) => (
+                                    <DraggableTask key={task._id} task={task} index={index} moveTask={moveTask} />
+                                ))}
+                            </IssueList>
+                        </Column>
+                        <Column>
+                            <ColumnTitle>In Progress</ColumnTitle>
+                            <IssueList>
+                                {progressTasks.map((task, index) => (
+                                    <DraggableTask key={task._id} task={task} index={index} moveTask={moveTask} />
+                                ))}
+                            </IssueList>
+                        </Column>
+                        <Column>
+                            <ColumnTitle>Completed</ColumnTitle>
+                            <IssueList>
+                                {completedTasks.map((task, index) => (
+                                    <DraggableTask key={task._id} task={task} index={index} moveTask={moveTask} />
+                                ))}
+                            </IssueList>
+                        </Column>
+                    </ColumnBox>
+                </Board>
+            </div>
+        </DndProvider>
+    );
+};
+
+const DraggableTask:React.FC<DraggableTaskProps> = ({ task, index, moveTask }) => {
+    const [, ref] = useDrag({
+        type: ItemTypes.TASK,
+        item: { taskId: task._id, sourceStatus: task.status },
+    });
+
+    const [, drop] = useDrop({
+        accept: ItemTypes.TASK,
+        hover: (draggedItem:any) => {
+            if (draggedItem.taskId !== task._id) {
+                moveTask(draggedItem.taskId, draggedItem.sourceStatus, task.status);
+                draggedItem.sourceStatus = task.status;
+            }
+        },
+    });
+
+    return (
+        <div ref={(node) => ref(drop(node))}>
+            <Task
+                taskId={task._id}
+                key={task._id}
+                priority={task.priority}
+                collaborators={task.collaborators}
+                name={task.name}
+                description={task.description}
+                dueDate={task.dueDate}
+                creatorEmail={task.creatorEmail}
+                status='Pending'
+            />
+        </div>
     );
 };
 

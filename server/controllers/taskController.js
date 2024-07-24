@@ -26,8 +26,6 @@ const createTask = async (req, res) => {
     });
     await notification.save();
 
-    req.app.get('io').emit('taskCreated', task);
-    req.app.get('io').emit('notification', notification);
 
     res.status(201).json(task);
   } catch (error) {
@@ -137,9 +135,7 @@ const updateTask = async (req, res) => {
 
     await notification.save();
 
-    req.app.get('io').emit('taskUpdated', task);
-    req.app.get('io').emit('notification', notification);
-
+    
     res.status(200).json(task);
   } catch (error) {
     console.error('Error updating task:', error);
@@ -168,8 +164,7 @@ const deleteTask = async (req, res) => {
     });
     await notification.save();
 
-    req.app.get('io').emit('taskDeleted', task);
-    req.app.get('io').emit('notification', notification);
+    
 
     res.status(200).json({ message: 'Task deleted' });
   } catch (error) {
