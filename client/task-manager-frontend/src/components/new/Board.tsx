@@ -34,40 +34,59 @@ interface Task {
     viewers: string[];
 }
 
-const ColumnList: React.FC<{ context: string, taskList: Task[], droppableId: string }> = ({ context, taskList, droppableId }) => {
-    return (
-        <Column>
-            <ColumnTitle>{context}</ColumnTitle>
-            <Droppable droppableId={droppableId}>
-                {(provided) => (
-                    <IssueList ref={provided.innerRef} {...provided.droppableProps}>
-                        {taskList.map((task, index) => (
-                            <Task
-                                key={task._id}
-                                index={index}
-                                taskId={task._id}
-                                priority={task.priority}
-                                collaborators={task.collaborators}
-                                name={task.name}
-                                description={task.description}
-                                dueDate={task.dueDate}
-                                creatorEmail={task.creatorEmail}
-                                status={task.status}
-                            />
-                        ))}
-                        {provided.placeholder}
-                    </IssueList>
-                )}
-            </Droppable>
-        </Column>
-    );
-};
+interface ColumnData {
+    name: string;
+    items: Task[];
+}
+
+interface ColumnsState {
+    [key: string]: ColumnData;
+}
+
+const ColumnList: React.FC<{ context: string, taskList: Task[], droppableId: string }> = ({ context, taskList, droppableId }) => (
+    <Column>
+        <ColumnTitle>{context}</ColumnTitle>
+        <Droppable droppableId={droppableId}>
+            {(provided) => (
+                <IssueList ref={provided.innerRef} {...provided.droppableProps}>
+                    {taskList.map((task, index) => (
+                        <Draggable key={task._id} draggableId={task._id} index={index}>
+                            {(provided) => (
+                                <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                >
+                                    <Task
+                                        key={task._id}
+                                        index={index}
+                                        taskId={task._id}
+                                        priority={task.priority}
+                                        collaborators={task.collaborators}
+                                        name={task.name}
+                                        description={task.description}
+                                        dueDate={task.dueDate}
+                                        creatorEmail={task.creatorEmail}
+                                        status={task.status}
+                                    />
+                                </div>
+                            )}
+                        </Draggable>
+                    ))}
+                    {provided.placeholder}
+                </IssueList>
+            )}
+        </Droppable>
+    </Column>
+);
 
 const AgileBoard: React.FC = () => {
     const { isSignedIn, user, isLoaded } = useUser();
-    const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
-    const [progressTasks, setProgressTasks] = useState<Task[]>([]);
-    const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+    const [columns, setColumns] = useState<ColumnsState>({
+        pending: { name: "Pending", items: [] },
+        progress: { name: "In Progress", items: [] },
+        completed: { name: "Completed", items: [] }
+    });
     const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
@@ -75,27 +94,27 @@ const AgileBoard: React.FC = () => {
     const fetchTasks = async () => {
         setIsLoading(true);
         try {
-            const pendingUrl = `${API_SERVER}/api/tasks?status=${encodeURIComponent('Pending')}`;
-            const inProgressUrl = `${API_SERVER}/api/tasks?status=${encodeURIComponent('In Progress')}`;
-            const completedUrl = `${API_SERVER}/api/tasks?status=${encodeURIComponent('Completed')}`;
-
-            const [responsePending, responseInProgress, responseCompleted] = await Promise.all([
-                fetch(pendingUrl),
-                fetch(inProgressUrl),
-                fetch(completedUrl)
+            const [pendingResponse, inProgressResponse, completedResponse] = await Promise.all([
+                fetch(`${API_SERVER}/api/tasks?status=Pending`),
+                fetch(`${API_SERVER}/api/tasks?status=In Progress`),
+                fetch(`${API_SERVER}/api/tasks?status=Completed`)
             ]);
 
-            if (!responsePending.ok || !responseInProgress.ok || !responseCompleted.ok) {
-                throw new Error(`HTTP error!`);
+            if (!pendingResponse.ok || !inProgressResponse.ok || !completedResponse.ok) {
+                throw new Error('Failed to fetch tasks');
             }
 
-            const dataPending = await responsePending.json();
-            const dataInProgress = await responseInProgress.json();
-            const dataCompleted = await responseCompleted.json();
+            const [dataPending, dataInProgress, dataCompleted] = await Promise.all([
+                pendingResponse.json(),
+                inProgressResponse.json(),
+                completedResponse.json()
+            ]);
 
-            setPendingTasks(dataPending);
-            setProgressTasks(dataInProgress);
-            setCompletedTasks(dataCompleted);
+            setColumns({
+                pending: { name: "Pending", items: dataPending },
+                progress: { name: "In Progress", items: dataInProgress },
+                completed: { name: "Completed", items: dataCompleted }
+            });
         } catch (error) {
             console.error('Error fetching tasks:', error);
         } finally {
@@ -113,21 +132,39 @@ const AgileBoard: React.FC = () => {
         fetchTasks();
     }, [currentUserEmail]);
 
+    const handleDragEnd = (result: DropResult) => {
+        if (!result.destination) return;
+
+        const { source, destination } = result;
+
+        if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+        const sourceColumn = columns[source.droppableId];
+        const destinationColumn = columns[destination.droppableId];
+        const [movedTask] = sourceColumn.items.splice(source.index, 1);
+
+        destinationColumn.items.splice(destination.index, 0, movedTask);
+
+        setColumns({
+            ...columns,
+            [source.droppableId]: sourceColumn,
+            [destination.droppableId]: destinationColumn
+        });
+    };
+
     return (
         <Board>
             <FilterButton onClick={() => navigate('/dashboard/create-task')}>Add a Task</FilterButton>
             <ColumnBox>
-                <DragDropContext onDragEnd={() => { }}>
-                    <ColumnList context="Pending" taskList={pendingTasks} droppableId="pending" />
-                    <ColumnList context="In Progress" taskList={progressTasks} droppableId="progress" />
-                    <ColumnList context="Completed" taskList={completedTasks} droppableId="completed" />
+                <DragDropContext onDragEnd={handleDragEnd}>
+                    {Object.entries(columns).map(([columnId, column]) => (
+                        <ColumnList key={columnId} context={column.name} taskList={column.items} droppableId={columnId} />
+                    ))}
                 </DragDropContext>
             </ColumnBox>
         </Board>
     );
 };
-
-export default AgileBoard;
 
 interface TaskProps {
     index: number;
@@ -159,7 +196,7 @@ const calculateTimeLeft = (dueDate: string) => {
     };
 };
 
-export const Task: React.FC<TaskProps> = ({ index, taskId, priority, name, description, dueDate, creatorEmail, status, collaborators }) => {
+ const Task: React.FC<TaskProps> = ({ index, taskId, priority, name, description, dueDate, creatorEmail, status, collaborators }) => {
     const { overdue, message } = calculateTimeLeft(dueDate);
     const { isSignedIn, user, isLoaded } = useUser();
     const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
@@ -174,44 +211,36 @@ export const Task: React.FC<TaskProps> = ({ index, taskId, priority, name, descr
     const deleteTask = async (taskId: string) => {
         const confirmed = window.confirm('Are you sure you want to delete this task?');
         if (!confirmed) return;
+
         try {
             const response = await fetch(`${API_SERVER}/api/tasks/${taskId}`, {
-                method: 'DELETE',
+                method: 'DELETE'
             });
-            navigate('/dashboard');
 
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
             }
+
+            navigate('/dashboard');
         } catch (error) {
             console.error('Error deleting task:', error);
         }
     };
 
     return (
-        <Draggable key={taskId} draggableId={taskId} index={index}>
-            {(provided) => (
-                <IssueItem
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    type={priority}
-                    overdue={overdue && status !== 'Completed'}>
-                    <DueTime>{message}</DueTime>
-                    <Creator>{creatorEmail}</Creator>
-                    <ActionButtons>
-                        {collaborators.includes(currentUserEmail as string) && (
-                            <StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>
-                        )}
-                        {currentUserEmail === creatorEmail && (
-                            <StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>
-                        )}
-                        <Button src={deleteIcon} onClick={() => deleteTask(taskId)} />
-                    </ActionButtons>
-                    <TaskName to={`${taskId}`}>{name}</TaskName>
-                    <Description>{description}</Description>
-                </IssueItem>
-            )}
-        </Draggable>
+        <IssueItem type={priority} overdue={overdue && status !== 'Completed'}>
+            <DueTime>{message}</DueTime>
+            <Creator>{creatorEmail}</Creator>
+            <ActionButtons>
+                {(collaborators.includes(currentUserEmail as string) || currentUserEmail === creatorEmail) && (
+                    <StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>
+                )}
+                <Button src={deleteIcon} onClick={() => deleteTask(taskId)} />
+            </ActionButtons>
+            <TaskName to={`${taskId}`}>{name}</TaskName>
+            <Description>{description}</Description>
+        </IssueItem>
     );
 };
+
+export default AgileBoard;
