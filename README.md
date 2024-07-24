@@ -17,9 +17,36 @@
 - Handle Tasks with multiple status , priority and other fields
 - Access Validation for different roles for a Task
 - Drag and Drop feature across different status 
-- Notifications for Viewers, Collaborators , Creator 
+- Notifications for every action to Viewers, Collaborators , Creator 
 - Use Email address or Goggle Account
 
+## Backend Structure 
+
+#### Task Service
+
+```
+  name: String, - Name of the Task
+  description: String, - Description of the Task
+  dueDate: UTC, - Due Date of the Task
+  priority: 'Low' | 'Medium' | 'High', - Priority of the Task
+  status: 'Pending' | 'In Progress' | 'Completed', - Status of the Task
+  creatorEmail: String, - Creator Email
+  collaborators?: String[], - Collaborators Emails
+  viewers?: String[], - Viewers Emails
+```
+
+#### Notification Service
+
+```
+  message: String, - Message of the Notification
+  taskId: String(ref - Task Table), 
+  users:String[], - Users who need to be Notified
+  updates?: [{
+    field: String,
+    oldValue: String,
+    newValue: String
+  }] - The field which is updated and its old value and new value of the Update
+```
 
 ## Access Validation
 
