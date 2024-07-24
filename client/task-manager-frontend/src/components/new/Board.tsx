@@ -6,8 +6,8 @@ import { API_SERVER } from '../../config/api';
 import io from 'socket.io-client';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { DragDropContext, DropResult, Droppable } from 'react-beautiful-dnd';
+
 
 const Board = styled.div`
     display: flex;
@@ -25,6 +25,7 @@ const Column = styled.div`
 
 const ColumnBox = styled.div`
     display: flex;
+    width:100%;
 `;
 
 const ColumnTitle = styled.h3`
@@ -78,14 +79,48 @@ interface Task {
     viewers: string[];
 }
 
-interface DraggableTaskProps{
-    task:Task;
-    index:number;
-    moveTask:any;
+interface DraggableTaskProps {
+    task: Task;
+    index: number;
+    moveTask: any;
 }
 
 const ItemTypes = {
     TASK: 'task',
+};
+
+const ColumnList: React.FC<{ context: string, taskList: Task[] }> = ({ context, taskList }) => {
+    return (
+        <div>
+            <Droppable droppableId='TaskList'>
+            {
+                (provided) => (
+                    <Column ref={provided.innerRef} {...provided.droppableProps}>
+                    <ColumnTitle>{context}</ColumnTitle>
+                    <IssueList>
+                        {taskList.map((task, index) => (
+                            <Task
+                                index={index}
+                                taskId={task._id}
+                                key={task._id}
+                                priority={task.priority}
+                                collaborators={task.collaborators}
+                                name={task.name}
+                                description={task.description}
+                                dueDate={task.dueDate}
+                                creatorEmail={task.creatorEmail}
+                                status={task.status}
+                            />
+                        ))}
+                        {provided.placeholder}
+                    </IssueList>
+                </Column>            
+                )
+            }
+            </Droppable>
+        </div>
+
+    );
 };
 
 const AgileBoard: React.FC = () => {
@@ -267,120 +302,28 @@ const AgileBoard: React.FC = () => {
         }
     };
 
-    const moveTask = (taskId: string, sourceStatus: string, targetStatus: string) => {
-        let taskToUpdate: Task | undefined;
+    const onDragEnd = (result:DropResult) => {
+        const { source , destination } = result;
+        console.log(result);
 
-        const updateTaskLists = (sourceList: Task[], targetList: Task[]) => {
-            const taskIndex = sourceList.findIndex(task => task._id === taskId);
-            if (taskIndex !== -1) {
-                taskToUpdate = { ...sourceList[taskIndex], status: targetStatus };
-                sourceList.splice(taskIndex, 1);
-                targetList.push(taskToUpdate);
-            }
-        };
-
-        switch (sourceStatus) {
-            case 'Pending':
-                updateTaskLists(pendingTasks, targetStatus === 'In Progress' ? progressTasks : completedTasks);
-                break;
-            case 'In Progress':
-                updateTaskLists(progressTasks, targetStatus === 'Pending' ? pendingTasks : completedTasks);
-                break;
-            case 'Completed':
-                updateTaskLists(completedTasks, targetStatus === 'Pending' ? pendingTasks : progressTasks);
-                break;
-            default:
-                break;
-        }
-
-        if (taskToUpdate) {
-            handleEditTask(taskToUpdate, taskId);
-        }
-    };
+        if (!destination) return;
+        
+        if (destination.droppableId ===source.droppableId) return ;
+        
+    }
 
     return (
-        <DndProvider backend={HTML5Backend}>
-            <div>
-                <FilterContainer>
-                    <FilterInput
-                        type="text"
-                        placeholder="Filter by name"
-                        value={filterName}
-                        onChange={e => setFilterName(e.target.value)}
-                    />
-                    <FilterButton onClick={handleResetForName}>Reset</FilterButton>
-                </FilterContainer>
-                <FilterContainer>
-                    <FilterInput
-                        type="text"
-                        placeholder="Filter by description"
-                        value={filterDesc}
-                        onChange={e => setFilterDesc(e.target.value)}
-                    />
-                    <FilterButton onClick={handleResetForDesc}>Reset</FilterButton>
-                </FilterContainer>
-                <Board>
-                    <ColumnBox>
-                        <Column>
-                            <ColumnTitle>Pending</ColumnTitle>
-                            <IssueList>
-                                {pendingTasks.map((task, index) => (
-                                    <DraggableTask key={task._id} task={task} index={index} moveTask={moveTask} />
-                                ))}
-                            </IssueList>
-                        </Column>
-                        <Column>
-                            <ColumnTitle>In Progress</ColumnTitle>
-                            <IssueList>
-                                {progressTasks.map((task, index) => (
-                                    <DraggableTask key={task._id} task={task} index={index} moveTask={moveTask} />
-                                ))}
-                            </IssueList>
-                        </Column>
-                        <Column>
-                            <ColumnTitle>Completed</ColumnTitle>
-                            <IssueList>
-                                {completedTasks.map((task, index) => (
-                                    <DraggableTask key={task._id} task={task} index={index} moveTask={moveTask} />
-                                ))}
-                            </IssueList>
-                        </Column>
-                    </ColumnBox>
-                </Board>
-            </div>
-        </DndProvider>
-    );
-};
-
-const DraggableTask:React.FC<DraggableTaskProps> = ({ task, index, moveTask }) => {
-    const [, ref] = useDrag({
-        type: ItemTypes.TASK,
-        item: { taskId: task._id, sourceStatus: task.status },
-    });
-
-    const [, drop] = useDrop({
-        accept: ItemTypes.TASK,
-        hover: (draggedItem:any) => {
-            if (draggedItem.taskId !== task._id) {
-                moveTask(draggedItem.taskId, draggedItem.sourceStatus, task.status);
-                draggedItem.sourceStatus = task.status;
-            }
-        },
-    });
-
-    return (
-        <div ref={(node) => ref(drop(node))}>
-            <Task
-                taskId={task._id}
-                key={task._id}
-                priority={task.priority}
-                collaborators={task.collaborators}
-                name={task.name}
-                description={task.description}
-                dueDate={task.dueDate}
-                creatorEmail={task.creatorEmail}
-                status='Pending'
-            />
+        <div>
+            <Board>
+                <FilterButton onClick={() => { navigate('/dashboard/create-task') }}>Add a Task</FilterButton>
+                <DragDropContext onDragEnd={onDragEnd}>
+                            <ColumnBox>
+                                <ColumnList context="Pending" taskList={pendingTasks} />
+                                <ColumnList context="In Progress" taskList={progressTasks} />
+                                <ColumnList context="Completed" taskList={completedTasks} />
+                           </ColumnBox>
+                </DragDropContext>
+            </Board>            
         </div>
     );
 };

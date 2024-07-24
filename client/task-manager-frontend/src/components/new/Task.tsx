@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import editIcon from '../../assets/edit_note_24dp.svg';
 import delteIcon from '../../assets/delete_24dp.svg';
 import { API_SERVER } from '../../config/api';
 import { useUser } from '@clerk/clerk-react';
+import { Draggable } from 'react-beautiful-dnd';
 
 interface IssueItemProps {
     type?: 'Low' | 'Medium' | 'High';
@@ -124,6 +125,7 @@ const Button = styled.img`
 `
 
 interface TaskProps {
+    index:number;
     taskId: string;
     priority: 'Low' | 'Medium' | 'High';
     name: string;
@@ -152,10 +154,11 @@ const calculateTimeLeft = (dueDate: string) => {
     };
 };
 
-export const Task: React.FC<TaskProps> = ({ taskId, priority, name, description, dueDate, creatorEmail,status,collaborators }) => {
+export const Task: React.FC<TaskProps> = ({ index,taskId, priority, name, description, dueDate, creatorEmail,status,collaborators }) => {
     const { overdue, message } = calculateTimeLeft(dueDate);
     const { isSignedIn, user, isLoaded } = useUser();
     const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+    const navigate = useNavigate();
   
     useEffect(() => {
       if (isSignedIn && isLoaded) {
@@ -171,7 +174,8 @@ export const Task: React.FC<TaskProps> = ({ taskId, priority, name, description,
           const response = await fetch(API_SERVER+`/api/tasks/${taskId}`, {
             method: 'DELETE',
           });
-    
+          navigate('/dashboard');
+
           if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
@@ -180,16 +184,28 @@ export const Task: React.FC<TaskProps> = ({ taskId, priority, name, description,
         }
       };
     return (
-        <IssueItem type={priority} overdue={overdue && status!=='Completed'}>
-            <DueTime>{message}</DueTime>
-            <Creator>{creatorEmail}</Creator>
-            <ActionButtons>
-                {collaborators.includes(currentUserEmail as string)&&<StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>}
-                {currentUserEmail == creatorEmail &&<StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>}
-                {currentUserEmail == creatorEmail&&<Button src={delteIcon} onClick={()=>deleteTask(taskId)}/>}
-            </ActionButtons>
-            <TaskName to={`${taskId}`}>{name}</TaskName>
-            <Description>{description}</Description>
-        </IssueItem>
+        <Draggable draggableId={taskId} index={index}>
+        {
+            (provided)=>(
+                <IssueItem 
+                ref={provided.innerRef} 
+                {...provided.draggableProps}
+                {...provided.dragHandleProps} 
+                type={priority} 
+                overdue={overdue && status!=='Completed'}>
+                    <DueTime>{message}</DueTime>
+                    <Creator>{creatorEmail}</Creator>
+                    <ActionButtons>
+                        {collaborators.includes(currentUserEmail as string)&&<StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>}
+                        {currentUserEmail == creatorEmail &&<StyledLink to={`edit/${taskId}`}><Button src={editIcon} /></StyledLink>}
+                        {<Button src={delteIcon} onClick={()=>deleteTask(taskId)}/>}
+                    </ActionButtons>
+                    <TaskName to={`${taskId}`}>{name}</TaskName>
+                    <Description>{description}</Description>
+                </IssueItem>
+            )
+        }
+        
+        </Draggable>
     );
 };
