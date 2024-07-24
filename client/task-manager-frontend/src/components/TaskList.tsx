@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { format } from 'date-fns';
 import { useUser } from '@clerk/clerk-react';
-import { io } from 'socket.io-client';
 import { API_SERVER } from '../config/api';
 
 interface Task {
@@ -62,19 +61,7 @@ const TaskList: React.FC = () => {
       const handleTaskDeleted = (deletedTask: Task) => {
         setTasks(prevTasks => prevTasks.filter(task => task._id !== deletedTask._id));
       };
-      const socket = io(API_SERVER+'/');
     
-      socket.on('taskCreated', handleTaskCreated);
-      socket.on('taskUpdated', handleTaskUpdated);
-      socket.on('taskDeleted', handleTaskDeleted);
-    
-      const disconnectSocket = () => {
-        socket.disconnect();
-      };
-    
-      return () => {
-        disconnectSocket();
-      };
   }, [currentUserEmail]);
 
 
